@@ -1,0 +1,70 @@
+# Notiflex 여정 기록
+
+이 파일은 독자가 실제로 진행한 내용을 기록한다. AI가 각 챕터 완료 시 자동으로 업데이트한다.
+
+## 진행 현황
+
+| 챕터 | 서브챕터 | 상태 | 완료일 | 비고 |
+|------|---------|------|--------|------|
+| ch2 | 2.2 설치 확인 | ✅ | 2026-06-29 | statusline 건너뜀 |
+| ch2 | 2.3 gcloud 설정 | ✅ | 2026-06-29 | 싱가포르 리전 선택 |
+| ch2 | 2.4 GitHub 저장소 | ✅ | 2026-06-29 | public 저장소로 생성 |
+| ch2 | 2.5 GKE 클러스터 | ✅ | 2026-06-29 | asia-southeast1-a |
+| ch2 | 2.6 빌드/배포 | ✅ | 2026-06-29 | Cloud Build 사용 |
+| ch2 | 2.7 첫 커밋 | ✅ | 2026-06-29 | |
+| ch3 | 3.2 GitOps 도구 | ⬜ | | |
+| ch3 | 3.3 기능 추가 | ⬜ | | |
+| ch3 | 3.4 CI | ⬜ | | |
+| ch3 | 3.5 CI-CD 연결 | ⬜ | | |
+| ch4 | 4.2 메트릭 모니터링 | ⬜ | | |
+| ch4 | 4.3 로그 수집 | ⬜ | | |
+| ch4 | 4.4 알림 | ⬜ | | |
+| ch5 | 5.2 트래픽 관리 | ⬜ | | |
+| ch5 | 5.3 무중단 배포 | ⬜ | | |
+| ch6 | 6.1 캐시 | ⬜ | | |
+| ch6 | 6.2 시크릿 관리 | ⬜ | | |
+| ch6 | 6.3 Canary 전환 | ⬜ | | |
+| ch7 | 7.2 멀티 노드풀 | ⬜ | | |
+| ch7 | 7.3 App of Apps | ⬜ | | |
+| ch7 | 7.4 멀티테넌시 | ⬜ | | |
+| ch8 | 8.1 메시징 | ⬜ | | |
+| ch8 | 8.2 트레이싱 | ⬜ | | |
+| ch8 | 8.3 CronJob | ⬜ | | |
+| ch9 | 9.1 저장소 분석 | ⬜ | | |
+| ch9 | 9.2 회고 | ⬜ | | |
+| ch9 | 9.3 온보딩 문서 | ⬜ | | |
+| ch9 | 9.4 GitAIOps 분석 | ⬜ | | |
+| ch9 | 9.5 마무리 | ⬜ | | |
+
+## 도구 선택 기록
+
+| 영역 | 선택 | 검토한 대안 | 선택 이유 |
+|------|------|-----------|----------|
+| 리전 | asia-southeast1 (싱가포르) | us-central1, asia-northeast3 | 비용과 지연 균형 |
+| 이미지 빌드 | Cloud Build | 로컬 Docker | Docker Desktop 없이 빌드 가능, CI와 동일한 방식 |
+| GitHub 저장소 | public | private | 실습 편의성 |
+
+## 현재 버전
+
+| 컴포넌트 | 버전 | 변경 이력 |
+|---------|------|----------|
+| Go | 1.25 | |
+| Notiflex 이미지 | v0.1.0 | 초기 버전 |
+| ArgoCD | | |
+| Kafka | | |
+| OTel SDK | | |
+
+## 현재 리소스
+
+| 노드풀 | 머신 타입 | 노드 수 | 주요 워크로드 |
+|--------|----------|---------|-------------|
+| default-pool | e2-medium | 2 (Spot VM) | notiflex-api |
+
+## 트러블슈팅 이력
+
+| 챕터 | 문제 | 해결 |
+|------|------|------|
+| ch2.3 | opjt-gitaiops-project 프로젝트 없음 | 새로 생성 |
+| ch2.6 | Cloud Build API 미활성화 | cloudbuild.googleapis.com, storage.googleapis.com 활성화 |
+| ch2.6 | Cloud Build → Artifact Registry 권한 없음 | roles/artifactregistry.writer 부여 |
+| ch2.6 | GKE 노드 → Artifact Registry 권한 없음 | roles/artifactregistry.reader 부여 |
