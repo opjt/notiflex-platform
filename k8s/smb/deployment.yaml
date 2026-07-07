@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: api
-        image: asia-southeast1-docker.pkg.dev/opjt-gitaiops-project/notiflex/api:v0.1.0
+        image: asia-southeast1-docker.pkg.dev/opjt-gitaiops-project/notiflex/api:v0.1.1
         ports:
         - containerPort: 8080
         env:

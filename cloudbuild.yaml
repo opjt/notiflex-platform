@@ -5,7 +5,7 @@ steps:
   - -f
   - app/Dockerfile
   - -t
-  - asia-southeast1-docker.pkg.dev/opjt-gitaiops-project/notiflex/api:v0.1.0
+  - asia-southeast1-docker.pkg.dev/opjt-gitaiops-project/notiflex/api:v0.1.1
   - .
 images:
-- asia-southeast1-docker.pkg.dev/opjt-gitaiops-project/notiflex/api:v0.1.0
+- asia-southeast1-docker.pkg.dev/opjt-gitaiops-project/notiflex/api:v0.1.1
