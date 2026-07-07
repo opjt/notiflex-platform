@@ -12,10 +12,10 @@
 | ch2 | 2.5 GKE 클러스터 | ✅ | 2026-06-29 | asia-southeast1-a |
 | ch2 | 2.6 빌드/배포 | ✅ | 2026-06-29 | Cloud Build 사용 |
 | ch2 | 2.7 첫 커밋 | ✅ | 2026-06-29 | |
-| ch3 | 3.2 GitOps 도구 | ⬜ | | |
-| ch3 | 3.3 기능 추가 | ⬜ | | |
-| ch3 | 3.4 CI | ⬜ | | |
-| ch3 | 3.5 CI-CD 연결 | ⬜ | | |
+| ch3 | 3.2 GitOps 도구 | ✅ | 2026-07-07 | ArgoCD 선택, automated sync+selfHeal |
+| ch3 | 3.3 기능 추가 | ✅ | 2026-07-07 | /version 엔드포인트 추가, Rolling Update 확인 |
+| ch3 | 3.4 CI | ✅ | 2026-07-07 | GitHub Actions, GCP_SA_KEY 방식 |
+| ch3 | 3.5 CI-CD 연결 | ✅ | 2026-07-07 | CI→deployment.yaml 자동 업데이트→ArgoCD 자동 Sync |
 | ch4 | 4.2 메트릭 모니터링 | ⬜ | | |
 | ch4 | 4.3 로그 수집 | ⬜ | | |
 | ch4 | 4.4 알림 | ⬜ | | |
@@ -43,14 +43,16 @@
 | 리전 | asia-southeast1 (싱가포르) | us-central1, asia-northeast3 | 비용과 지연 균형 |
 | 이미지 빌드 | Cloud Build | 로컬 Docker | Docker Desktop 없이 빌드 가능, CI와 동일한 방식 |
 | GitHub 저장소 | public | private | 실습 편의성 |
+| GitOps 도구 (ADR-001) | ArgoCD | Flux | CRD 기반 Application 리소스, UI 제공, 3분 폴링 자동 Sync |
+| CI 도구 (ADR-002) | GitHub Actions | Cloud Build, Jenkins | 저장소와 동일 플랫폼, secrets 연동 간편, 무료 |
 
 ## 현재 버전
 
 | 컴포넌트 | 버전 | 변경 이력 |
 |---------|------|----------|
 | Go | 1.25 | |
-| Notiflex 이미지 | v0.1.0 | 초기 버전 |
-| ArgoCD | | |
+| Notiflex 이미지 | sha-63528dd (v0.2.0) | /version 엔드포인트 추가, CI 자동 태깅 |
+| ArgoCD | v2.x (latest stable) | ch3.2에서 설치 |
 | Kafka | | |
 | OTel SDK | | |
 
@@ -68,3 +70,7 @@
 | ch2.6 | Cloud Build API 미활성화 | cloudbuild.googleapis.com, storage.googleapis.com 활성화 |
 | ch2.6 | Cloud Build → Artifact Registry 권한 없음 | roles/artifactregistry.writer 부여 |
 | ch2.6 | GKE 노드 → Artifact Registry 권한 없음 | roles/artifactregistry.reader 부여 |
+| ch3.2 | ArgoCD CRD 설치 실패 | --server-side=true --force-conflicts=true 옵션 사용 |
+| ch3.2 | ArgoCD NetworkPolicy가 GitHub 접근 차단 | kubectl delete networkpolicy -n argocd --all |
+| ch3.4 | GitHub Actions manifest push 403 | gh api로 default_workflow_permissions=write 설정 |
+| ch3.4 | can_approve_pull_request_reviews 타입 오류 | gh api -f 대신 -F 플래그 사용 |
