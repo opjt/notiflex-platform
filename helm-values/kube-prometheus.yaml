@@ -18,6 +18,24 @@ alertmanager:
       requests:
         cpu: 25m
         memory: 64Mi
+  config:
+    global:
+      resolve_timeout: 5m
+    receivers:
+    - name: 'default'
+    - name: 'torchi'
+      webhook_configs:
+      - url: 'http://webhook-bridge.monitoring.svc.cluster.local:8080/webhook'
+    route:
+      group_by: ['alertname', 'namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'default'
+      routes:
+      - receiver: 'torchi'
+        matchers:
+        - namespace =~ "notiflex"
 
 prometheusOperator:
   resources:

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-bridge
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook-bridge
+  template:
+    metadata:
+      labels:
+        app: webhook-bridge
+    spec:
+      containers:
+      - name: bridge
+        image: asia-southeast1-docker.pkg.dev/opjt-gitaiops-project/notiflex/webhook-bridge:v0.1.0
+        ports:
+        - containerPort: 8080
+        env:
+        - name: TORCHI_URL
+          valueFrom:
+            secretKeyRef:
+              name: webhook-bridge
+              key: torchi-url
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-bridge
+  namespace: monitoring
+spec:
+  selector:
+    app: webhook-bridge
+  ports:
+  - port: 8080
+    targetPort: 8080

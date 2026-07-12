@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: notiflex-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus
+spec:
+  groups:
+  - name: notiflex
+    interval: 1m
+    rules:
+    - alert: PodRestarting
+      expr: increase(kube_pod_container_status_restarts_total{namespace="notiflex"}[10m]) > 0
+      for: 0m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod이 재시작되고 있습니다"
+
+    - alert: PodNotReady
+      expr: kube_pod_status_ready{namespace="notiflex", condition="false"} > 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod이 Ready 상태가 아닙니다"
