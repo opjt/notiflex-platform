@@ -16,9 +16,9 @@
 | ch3 | 3.3 기능 추가 | ✅ | 2026-07-07 | /version 엔드포인트 추가, Rolling Update 확인 |
 | ch3 | 3.4 CI | ✅ | 2026-07-07 | GitHub Actions, GCP_SA_KEY 방식 |
 | ch3 | 3.5 CI-CD 연결 | ✅ | 2026-07-07 | CI→deployment.yaml 자동 업데이트→ArgoCD 자동 Sync |
-| ch4 | 4.2 메트릭 모니터링 | ⬜ | | |
-| ch4 | 4.3 로그 수집 | ⬜ | | |
-| ch4 | 4.4 알림 | ⬜ | | |
+| ch4 | 4.2 메트릭 모니터링 | ✅ | 2026-07-12 | kube-prometheus-stack, Prometheus+Grafana |
+| ch4 | 4.3 로그 수집 | ✅ | 2026-07-12 | Loki+Fluent Bit, SingleBinary 모드 |
+| ch4 | 4.4 알림 | ✅ | 2026-07-12 | PrometheusRule+Alertmanager+webhook-bridge→torchi.app |
 | ch5 | 5.2 트래픽 관리 | ⬜ | | |
 | ch5 | 5.3 무중단 배포 | ⬜ | | |
 | ch6 | 6.1 캐시 | ⬜ | | |
@@ -45,14 +45,22 @@
 | GitHub 저장소 | public | private | 실습 편의성 |
 | GitOps 도구 (ADR-001) | ArgoCD | Flux | CRD 기반 Application 리소스, UI 제공, 3분 폴링 자동 Sync |
 | CI 도구 (ADR-002) | GitHub Actions | Cloud Build, Jenkins | 저장소와 동일 플랫폼, secrets 연동 간편, 무료 |
+| 메트릭 모니터링 (ADR-003) | Prometheus + Grafana | Datadog, Victoria Metrics | CNCF 졸업 프로젝트, kube-prometheus-stack으로 한번에 설치, PromQL 표준 |
+| 로그 수집 (ADR-004) | Loki + Fluent Bit | ELK, CloudWatch | 라벨 기반 인덱싱으로 저비용, Grafana와 통합, DaemonSet 경량 수집 |
+| 알림 연동 (ADR-005) | PrometheusRule + Alertmanager + webhook-bridge | PagerDuty, OpsGenie | GitOps 호환 CRD, 커스텀 Push 서비스(torchi.app) 연동 위해 브릿지 직접 구현 |
 
 ## 현재 버전
 
 | 컴포넌트 | 버전 | 변경 이력 |
 |---------|------|----------|
 | Go | 1.25 | |
-| Notiflex 이미지 | sha-63528dd (v0.2.0) | /version 엔드포인트 추가, CI 자동 태깅 |
+| Notiflex 이미지 | sha-a6d73fc | HTTP 요청 로그 추가 (ch4.3) |
 | ArgoCD | v2.x (latest stable) | ch3.2에서 설치 |
+| Prometheus | v3.13.1 | kube-prometheus-stack (ch4.2) |
+| Grafana | 13.1.0 | kube-prometheus-stack (ch4.2) |
+| Loki | 3.6.7 | SingleBinary 모드 (ch4.3) |
+| Fluent Bit | 2.1.0 | grafana/fluent-bit-plugin-loki (ch4.3) |
+| webhook-bridge | v0.1.0 | torchi.app 알림 브릿지 (ch4.4) |
 | Kafka | | |
 | OTel SDK | | |
 
@@ -74,3 +82,9 @@
 | ch3.2 | ArgoCD NetworkPolicy가 GitHub 접근 차단 | kubectl delete networkpolicy -n argocd --all |
 | ch3.4 | GitHub Actions manifest push 403 | gh api로 default_workflow_permissions=write 설정 |
 | ch3.4 | can_approve_pull_request_reviews 타입 오류 | gh api -f 대신 -F 플래그 사용 |
+| ch4.2 | ArgoCD 비밀번호 리셋 실패 | htpasswd -nbBC 10으로 올바른 bcrypt 해시 생성 후 argocd-secret 패치 |
+| ch4.3 | Loki chunks/results cache Pending | CPU/메모리 부족 → chunksCache/resultsCache enabled: false |
+| ch4.3 | Fluent Bit deprecated chart hardcoded URL | ConfigMap 직접 패치로 loki-gateway 주소 변경 (helm upgrade 시 초기화 주의) |
+| ch4.3 | Fluent Bit mem buf overlimit | requests 64Mi → 128Mi, limits 256Mi 증가 |
+| ch4.4 | webhook-bridge x509 인증서 에러 | scratch 이미지에 CA 인증서 없음 → alpine builder에서 ca-certificates.crt 복사 |
+| ch4.4 | PodRestarting 알림 rollout restart로 미트리거 | rollout restart는 Pod 교체라 restarts 카운트 미증가 → kubectl debug + busybox로 kill 1 |
