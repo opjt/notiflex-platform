@@ -1,14 +1,16 @@
 resources:
   requests:
     cpu: 10m
-    memory: 64Mi
+    memory: 128Mi
+  limits:
+    memory: 256Mi
 
 config:
   outputs: |
     [OUTPUT]
         Name loki
         Match kube.*
-        Host loki.monitoring.svc.cluster.local
-        Port 3100
+        Host loki-gateway.monitoring.svc.cluster.local
+        Port 80
         Labels job=fluent-bit, namespace=$kubernetes['namespace_name'], pod=$kubernetes['pod_name'], container=$kubernetes['container_name']
         Auto_Kubernetes_Labels off
