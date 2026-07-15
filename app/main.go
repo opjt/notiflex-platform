@@ -11,7 +11,7 @@ import (
 
 var counter atomic.Int64
 
-const version = "v0.2.0"
+const version = "v0.3.0"
 
 func main() {
 	http.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
