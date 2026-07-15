@@ -19,8 +19,8 @@
 | ch4 | 4.2 메트릭 모니터링 | ✅ | 2026-07-12 | kube-prometheus-stack, Prometheus+Grafana |
 | ch4 | 4.3 로그 수집 | ✅ | 2026-07-12 | Loki+Fluent Bit, SingleBinary 모드 |
 | ch4 | 4.4 알림 | ✅ | 2026-07-12 | PrometheusRule+Alertmanager+webhook-bridge→torchi.app |
-| ch5 | 5.2 트래픽 관리 | ⬜ | | |
-| ch5 | 5.3 무중단 배포 | ⬜ | | |
+| ch5 | 5.2 트래픽 관리 | ✅ | 2026-07-15 | Gateway API, proxy-only 서브넷 생성 필요 |
+| ch5 | 5.3 무중단 배포 | ✅ | 2026-07-15 | Argo Rollouts Blue/Green, autoPromotionSeconds: 30 |
 | ch6 | 6.1 캐시 | ⬜ | | |
 | ch6 | 6.2 시크릿 관리 | ⬜ | | |
 | ch6 | 6.3 Canary 전환 | ⬜ | | |
@@ -48,14 +48,17 @@
 | 메트릭 모니터링 (ADR-003) | Prometheus + Grafana | Datadog, Victoria Metrics | CNCF 졸업 프로젝트, kube-prometheus-stack으로 한번에 설치, PromQL 표준 |
 | 로그 수집 (ADR-004) | Loki + Fluent Bit | ELK, CloudWatch | 라벨 기반 인덱싱으로 저비용, Grafana와 통합, DaemonSet 경량 수집 |
 | 알림 연동 (ADR-005) | PrometheusRule + Alertmanager + webhook-bridge | PagerDuty, OpsGenie | GitOps 호환 CRD, 커스텀 Push 서비스(torchi.app) 연동 위해 브릿지 직접 구현 |
+| 트래픽 관리 (ADR-006) | GKE Gateway API (gke-l7-regional-external-managed) | NGINX Ingress, Istio Gateway | GKE 네이티브 L7 LB, HealthCheckPolicy CRD로 헬스체크 선언적 설정 가능 |
+| 무중단 배포 (ADR-007) | Argo Rollouts Blue/Green | Flagger, K8s Rolling Update | ArgoCD와 동일 Argo 생태계, CRD 선언적 전략, Blue/Green→Canary 점진 진화 가능 |
 
 ## 현재 버전
 
 | 컴포넌트 | 버전 | 변경 이력 |
 |---------|------|----------|
 | Go | 1.25 | |
-| Notiflex 이미지 | sha-a6d73fc | HTTP 요청 로그 추가 (ch4.3) |
-| ArgoCD | v2.x (latest stable) | ch3.2에서 설치 |
+| Notiflex 이미지 | sha-9681aaf | v0.3.0, Blue/Green 배포 테스트 (ch5.3) |
+| Argo Rollouts | v1.9.0 | Blue/Green 전략 (ch5.3) |
+| ArgoCD | v3.4.4 | ch3.2에서 설치 |
 | Prometheus | v3.13.1 | kube-prometheus-stack (ch4.2) |
 | Grafana | 13.1.0 | kube-prometheus-stack (ch4.2) |
 | Loki | 3.6.7 | SingleBinary 모드 (ch4.3) |
@@ -88,3 +91,4 @@
 | ch4.3 | Fluent Bit mem buf overlimit | requests 64Mi → 128Mi, limits 256Mi 증가 |
 | ch4.4 | webhook-bridge x509 인증서 에러 | scratch 이미지에 CA 인증서 없음 → alpine builder에서 ca-certificates.crt 복사 |
 | ch4.4 | PodRestarting 알림 rollout restart로 미트리거 | rollout restart는 Pod 교체라 restarts 카운트 미증가 → kubectl debug + busybox로 kill 1 |
+| ch5.2 | Gateway PROGRAMMED=False | asia-southeast1 리전에 proxy-only 서브넷 없음 → 172.16.0.0/23 생성 |
