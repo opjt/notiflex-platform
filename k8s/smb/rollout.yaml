@@ -32,13 +32,6 @@ spec:
         - name: secrets
           mountPath: /mnt/secrets
           readOnly: true
-      volumes:
-      - name: secrets
-        csi:
-          driver: secrets-store-gke.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: notiflex-secrets
         readinessProbe:
           httpGet:
             path: /health
@@ -51,6 +44,13 @@ spec:
             port: 8080
           initialDelaySeconds: 10
           periodSeconds: 30
+      volumes:
+      - name: secrets
+        csi:
+          driver: secrets-store-gke.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: notiflex-secrets
   strategy:
     blueGreen:
       activeService: notiflex-api
