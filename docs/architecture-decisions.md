@@ -55,3 +55,27 @@
 - CRD 선언으로 배포 전략을 GitOps 방식으로 관리, Deployment와 동일한 인터페이스
 - Green 준비 완료 후 트래픽 전환이라 Rolling Update 대비 사용자 영향 최소화
 - 5장 Blue/Green → 6장 Canary로 전략 전환 시 Rollout spec 수정만으로 가능
+
+## ADR-008: 분산 캐시로 Valkey 선택 (6장)
+**시점**: 2026-07 / **결정**: Pod 간 공유 카운터에 Valkey를 채택, Redis 및 Memcached 미사용
+**이유**:
+- Redis의 SSPL 라이선스 변경(2018) 이후 BSD 라이선스를 유지하는 공식 포크로 기업 환경에서 법적 리스크 없음
+- Redis 프로토콜 완전 호환이라 클라이언트 교체 없이 `valkey-go` 라이브러리 사용 가능
+- INCR 명령어로 원자적 카운터 보장 — 멀티 Pod 환경에서 중복 ID 없이 분산 상태 공유
+- Memcached 대비 영속성(AOF/RDB)과 데이터 구조 다양성 제공, 향후 세션·큐 등으로 확장 가능
+
+## ADR-009: 시크릿 관리로 Secrets Store CSI + GCP Secret Manager + Workload Identity 선택 (6장)
+**시점**: 2026-07 / **결정**: CSI 드라이버 파일 마운트 방식 채택, External Secrets Operator 및 환경변수 직접 주입 미사용
+**이유**:
+- Workload Identity로 JSON 키 파일 없이 GKE OIDC 토큰만으로 GCP SA 인증 — 자격증명이 클러스터에 저장되지 않음
+- 시크릿이 K8s Secret 오브젝트로 생성되지 않아 `kubectl get secret`으로 평문 노출 불가
+- SecretProviderClass CRD로 어떤 시크릿을 어디에 마운트할지 Git으로 선언적 관리
+- GCP Secret Manager의 버전 관리·감사 로그·자동 교체 기능을 그대로 활용
+
+## ADR-010: 배포 전략을 Blue/Green에서 Canary로 전환 (6장)
+**시점**: 2026-07 / **결정**: Argo Rollouts strategy를 blueGreen → canary(20%→50%→80%→100%)로 변경, 새 도구 도입 없음
+**이유**:
+- 전체 사용자가 아닌 일부(20%)에게 먼저 노출해 장애 영향 범위를 최소화
+- Blue/Green 대비 리소스 효율 개선 (2x → 1.2x), 소규모 클러스터에서 CPU 여유 확보
+- 각 단계(30초)에서 메트릭·로그 관찰 후 abort 가능, 자동 승격까지 안전 관찰 시간 확보
+- 동일한 Rollout CRD에서 strategy 필드만 교체하여 새 컨트롤러 없이 전략 진화
