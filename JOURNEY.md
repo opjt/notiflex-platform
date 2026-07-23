@@ -27,7 +27,7 @@
 | ch6 | 6.4 아키텍처 스냅샷 | ✅ | 2026-07-19 | claude-context/architecture.md 작성 |
 | ch7 | 7.2 멀티 노드풀 | ✅ | 2026-07-23 | api-pool, worker-pool 생성. ops-pool은 IP 쿼터 초과로 보류 |
 | ch7 | 7.3 App of Apps | ✅ | 2026-07-23 | root-app + argocd/apps/, notiflex-smb 이관 |
-| ch7 | 7.4 멀티테넌시 | ✅ | 2026-07-23 | k8s/enterprise/ 생성, Valkey Secret은 git 미포함(kubectl로 직접 생성) |
+| ch7 | 7.4 멀티테넌시 | ✅ | 2026-07-23 | k8s/enterprise/ 생성. Valkey 비밀번호는 최초 평문 K8s Secret → 이후 smb와 동일하게 GCP Secret Manager+CSI+Workload Identity로 전환 완료 |
 | ch8 | 8.1 메시징 | ⬜ | | |
 | ch8 | 8.2 트레이싱 | ⬜ | | |
 | ch8 | 8.3 CronJob | ⬜ | | |
@@ -57,6 +57,7 @@
 | 워크로드 노드 배치 (ch7.2) | nodeSelector + 멀티 노드풀 | taint/toleration, nodeAffinity | 가장 단순, GKE가 `cloud.google.com/gke-nodepool` 라벨 자동 부여, 학습 곡선 최소 |
 | 여러 앱 관리 (ch7.3) | App of Apps | ApplicationSet, 수동 관리 | 관리 앱 5~7개 수준, 순수 YAML로 충분, root-app이 argocd/apps/ 디렉터리 감시 |
 | 멀티테넌시 (ch7.4) | Namespace 분리 + per-tenant Rollout | 단일 namespace + 라벨 격리, vCluster | 강한 격리, ArgoCD App of Apps와 자연 결합, 테넌트별 독립 배포 |
+| enterprise 시크릿 관리 (ch7.4) | GCP Secret Manager + CSI + Workload Identity (smb와 동일 secret 재사용) | 평문 K8s Secret 유지 | public 저장소에 실제 비밀번호 노출 방지, smb와 동일 패턴으로 통일, 같은 Valkey를 공유하므로 별도 secret 불필요 |
 
 ## 현재 버전
 
@@ -108,3 +109,5 @@
 | ch6.2 | helm upgrade 전 kubectl patch StatefulSet 무효 | Helm이 values 기준으로 pod 재생성 시 덮어씀 → 반드시 helm upgrade --set으로 변경 |
 | ch7.2 | ops-pool 생성 시 IN_USE_ADDRESSES(외부 IP) 쿼터 4/4 초과 | 쿼터 증설 요청 제출했으나 즉시 승인 안 됨(콘솔에서도 "지정한 옵션으로는 요청 불가"). ops-pool 생성 보류, api-pool+worker-pool 2개로 진행. 8.2 Tempo는 worker-pool에 통합 배치 예정 |
 | ch7.2 | ArgoCD auto-sync가 커밋을 바로 못 가져옴 | `kubectl patch application <app> -n argocd --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'`로 수동 hard refresh |
+| ch7.4 | 가드레일이 valkey-secret.yaml에 실제 비밀번호를 평문으로 커밋하라고 함 | public 저장소라 노출 위험 → 파일 대신 kubectl create secret으로 클러스터에 직접 생성(git 미포함), 이후 Secret Manager로 재전환 |
+| ch7.4(부가) | ArgoCD admin 비밀번호 분실(ch4.2 htpasswd 리셋 값 미기록) | argocd-secret의 admin.password를 새 bcrypt 해시로 재패치하여 재설정 |
