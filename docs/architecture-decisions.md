@@ -79,3 +79,36 @@
 - Blue/Green 대비 리소스 효율 개선 (2x → 1.2x), 소규모 클러스터에서 CPU 여유 확보
 - 각 단계(30초)에서 메트릭·로그 관찰 후 abort 가능, 자동 승격까지 안전 관찰 시간 확보
 - 동일한 Rollout CRD에서 strategy 필드만 교체하여 새 컨트롤러 없이 전략 진화
+
+## ADR-011: 워크로드 노드 배치로 nodeSelector + 멀티 노드풀 선택 (7장)
+**시점**: 2026-07 / **결정**: 역할별 노드풀(api-pool, worker-pool)을 생성하고 nodeSelector로 배치, taint/toleration 및 nodeAffinity는 사용하지 않는다
+**이유**:
+- GKE가 노드풀 생성 시 `cloud.google.com/gke-nodepool` 라벨을 자동 부여해 커스텀 라벨 관리가 불필요
+- YAML에 nodeSelector 한 줄만 추가하면 되는 가장 단순한 방식
+- taint/toleration 대비 학습 곡선이 낮고, 이 규모의 클러스터에서 "거부" 기능까지는 불필요
+- 단일 존 클러스터라 topology spread 등 AZ 분산 전략은 의미가 없음
+- ops-pool은 리전 외부 IP 쿼터(IN_USE_ADDRESSES 4/4) 초과로 생성 보류, api-pool·worker-pool 2개로 우선 구성
+
+## ADR-012: 여러 ArgoCD 앱 관리로 App of Apps 패턴 선택 (7장)
+**시점**: 2026-07 / **결정**: root-app이 `argocd/apps/` 디렉터리를 감시하는 App of Apps 구조를 채택, ApplicationSet 및 수동 관리는 사용하지 않는다
+**이유**:
+- 관리할 Application이 5~7개 수준으로, ApplicationSet의 템플릿 기능 없이도 순수 YAML로 충분
+- `argocd/apps/`에 파일만 추가하면 root-app이 자동으로 인식해 배포, kubectl apply 누락 위험 제거
+- Git 디렉터리 자체가 클러스터 상태의 단일 진실 공급원이 되어 GitOps 원칙에 충실
+- 기존 `argocd/notiflex-smb.yaml`을 디렉터리만 이동해 다운타임 없이 root-app 관리로 전환 가능
+
+## ADR-013: 멀티테넌시로 Namespace 분리 + per-tenant Rollout 선택 (7장)
+**시점**: 2026-07 / **결정**: 테넌트(enterprise)별로 별도 Namespace와 Rollout을 두는 구조를 채택, 단일 namespace+라벨 격리 및 vCluster는 사용하지 않는다
+**이유**:
+- e2-medium 노드 소수 구성의 단일 클러스터에서 vCluster·클러스터 분리는 비용·운영 복잡도 대비 실익이 없음
+- Namespace + RBAC만으로 추가 도구 없이 논리적 격리와 리소스 그룹화가 가능
+- 방금 도입한 App of Apps 구조(`argocd/apps/`)에 테넌트 Application을 그대로 추가할 수 있어 관리 패턴이 일관됨
+- cross-namespace DNS로 공유 Valkey에 접근하게 하여, 클러스터 확장 없이 테넌트 간 공유 리소스 접근 패턴을 학습
+
+## ADR-014: enterprise 시크릿 관리를 GCP Secret Manager + CSI로 통일 (7장)
+**시점**: 2026-07 / **결정**: enterprise 테넌트의 Valkey 비밀번호도 smb와 동일하게 Secret Manager + CSI + Workload Identity 방식으로 전환하고, 평문 K8s Secret은 사용하지 않는다
+**이유**:
+- 저장소가 public이라 K8s Secret(base64, 사실상 평문)을 커밋하면 실제 비밀번호가 그대로 노출됨
+- smb와 enterprise가 동일한 Valkey 인스턴스를 공유하므로 Secret Manager의 시크릿도 하나만 두면 충분
+- 기존 GCP SA(`notiflex-api@...`)에 enterprise KSA용 Workload Identity 바인딩만 추가하면 되어 신규 IAM 자원 없이 확장 가능
+- smb와 동일한 CSI 마운트 패턴을 재사용해 테넌트가 늘어나도 시크릿 관리 방식이 하나로 통일됨
