@@ -25,9 +25,9 @@
 | ch6 | 6.2 시크릿 관리 | ✅ | 2026-07-18 | Secrets Store CSI + GCP Secret Manager + Workload Identity |
 | ch6 | 6.3 Canary 전환 | ✅ | 2026-07-19 | Blue/Green → Canary 전환, v0.6.0 배포 검증 |
 | ch6 | 6.4 아키텍처 스냅샷 | ✅ | 2026-07-19 | claude-context/architecture.md 작성 |
-| ch7 | 7.2 멀티 노드풀 | ⬜ | | |
-| ch7 | 7.3 App of Apps | ⬜ | | |
-| ch7 | 7.4 멀티테넌시 | ⬜ | | |
+| ch7 | 7.2 멀티 노드풀 | ✅ | 2026-07-23 | api-pool, worker-pool 생성. ops-pool은 IP 쿼터 초과로 보류 |
+| ch7 | 7.3 App of Apps | ✅ | 2026-07-23 | root-app + argocd/apps/, notiflex-smb 이관 |
+| ch7 | 7.4 멀티테넌시 | ✅ | 2026-07-23 | k8s/enterprise/ 생성, Valkey Secret은 git 미포함(kubectl로 직접 생성) |
 | ch8 | 8.1 메시징 | ⬜ | | |
 | ch8 | 8.2 트레이싱 | ⬜ | | |
 | ch8 | 8.3 CronJob | ⬜ | | |
@@ -54,6 +54,9 @@
 | 캐시 (ch6.1) | Valkey (Redis fork) | Redis, Memcached | BSD 라이선스, Redis 호환, SSPL 회피 |
 | 시크릿 관리 (ch6.2) | Secrets Store CSI + GCP Secret Manager + Workload Identity | External Secrets, 환경변수 직접 주입 | JSON 키 파일 없이 GKE OIDC로 인증, 시크릿이 클러스터에 저장되지 않음 |
 | 배포 전략 고도화 (ch6.3) | Canary (20%→50%→80%→100%) | Blue/Green 유지 | 리소스 1.2x로 효율적, 단계별 관찰로 위험 최소화, Rollout strategy만 변경 |
+| 워크로드 노드 배치 (ch7.2) | nodeSelector + 멀티 노드풀 | taint/toleration, nodeAffinity | 가장 단순, GKE가 `cloud.google.com/gke-nodepool` 라벨 자동 부여, 학습 곡선 최소 |
+| 여러 앱 관리 (ch7.3) | App of Apps | ApplicationSet, 수동 관리 | 관리 앱 5~7개 수준, 순수 YAML로 충분, root-app이 argocd/apps/ 디렉터리 감시 |
+| 멀티테넌시 (ch7.4) | Namespace 분리 + per-tenant Rollout | 단일 namespace + 라벨 격리, vCluster | 강한 격리, ArgoCD App of Apps와 자연 결합, 테넌트별 독립 배포 |
 
 ## 현재 버전
 
@@ -71,12 +74,16 @@
 | webhook-bridge | v0.1.0 | torchi.app 알림 브릿지 (ch4.4) |
 | Kafka | | |
 | OTel SDK | | |
+| notiflex-api replicas | 2 | 1→2로 확장 (ch7.2) |
 
 ## 현재 리소스
 
 | 노드풀 | 머신 타입 | 노드 수 | 주요 워크로드 |
 |--------|----------|---------|-------------|
-| default-pool | e2-standard-2 | 2 (Spot VM) | notiflex-api, valkey, 모니터링 스택 |
+| default-pool | e2-standard-2 | 2 (Spot VM) | valkey, 모니터링 스택 |
+| api-pool | e2-medium | 1 (Spot VM) | notiflex-api (nodeSelector, ch7.2) |
+| worker-pool | e2-standard-2 | 1 (Spot VM) | (미배치, ch8.1 Kafka 예정) |
+| ops-pool | - | 0 | 미생성. 리전 외부 IP 쿼터(IN_USE_ADDRESSES 4/4) 초과로 보류. 8.2 Tempo는 worker-pool에 통합 배치 예정 |
 
 ## 트러블슈팅 이력
 
@@ -99,3 +106,5 @@
 | ch5.2 | Gateway PROGRAMMED=False | asia-southeast1 리전에 proxy-only 서브넷 없음 → 172.16.0.0/23 생성 |
 | ch6.2 | CSI DaemonSet 설치 후 노드 CPU 100% | csi-secrets-store-provider-gke 50m×2 추가로 Valkey Pending → 모니터링 스택 CPU 최소화(5m~1m), Valkey Helm upgrade --set cpu=10m |
 | ch6.2 | helm upgrade 전 kubectl patch StatefulSet 무효 | Helm이 values 기준으로 pod 재생성 시 덮어씀 → 반드시 helm upgrade --set으로 변경 |
+| ch7.2 | ops-pool 생성 시 IN_USE_ADDRESSES(외부 IP) 쿼터 4/4 초과 | 쿼터 증설 요청 제출했으나 즉시 승인 안 됨(콘솔에서도 "지정한 옵션으로는 요청 불가"). ops-pool 생성 보류, api-pool+worker-pool 2개로 진행. 8.2 Tempo는 worker-pool에 통합 배치 예정 |
+| ch7.2 | ArgoCD auto-sync가 커밋을 바로 못 가져옴 | `kubectl patch application <app> -n argocd --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'`로 수동 hard refresh |
