@@ -13,6 +13,7 @@ spec:
       labels:
         app: notiflex-api
     spec:
+      serviceAccountName: notiflex-api
       nodeSelector:
         cloud.google.com/gke-nodepool: api-pool
       containers:
@@ -47,8 +48,11 @@ spec:
           periodSeconds: 30
       volumes:
       - name: secrets
-        secret:
-          secretName: valkey-enterprise
+        csi:
+          driver: secrets-store-gke.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: notiflex-secrets
   strategy:
     canary:
       canaryService: notiflex-api-preview
