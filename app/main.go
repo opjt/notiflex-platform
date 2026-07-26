@@ -7,14 +7,18 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/IBM/sarama"
 	"github.com/valkey-io/valkey-go"
 )
 
-const version = "v0.6.0"
+const version = "v0.7.0"
+const notificationsTopic = "notifications"
 
 var valkeyClient valkey.Client
+var kafkaProducer sarama.SyncProducer
 
 func main() {
 	addr := os.Getenv("VALKEY_ADDR")
@@ -45,6 +49,30 @@ func main() {
 	}
 	defer valkeyClient.Close()
 
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
+	if kafkaBroker == "" {
+		kafkaBroker = "localhost:9092"
+	}
+
+	kafkaCfg := sarama.NewConfig()
+	kafkaCfg.Version = sarama.V4_3_0_0
+	kafkaCfg.Producer.Return.Successes = true
+
+	for i := 0; i < 10; i++ {
+		kafkaProducer, err = sarama.NewSyncProducer([]string{kafkaBroker}, kafkaCfg)
+		if err == nil {
+			break
+		}
+		log.Printf("Kafka Producer 연결 재시도 %d/10: %v", i+1, err)
+		time.Sleep(3 * time.Second)
+	}
+	if err != nil {
+		log.Fatalf("Kafka Producer 연결 실패: %v", err)
+	}
+	defer kafkaProducer.Close()
+
+	go runConsumer(kafkaBroker, kafkaCfg)
+
 	http.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("method=%s path=%s", r.Method, r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
@@ -72,6 +100,15 @@ func main() {
 			return
 		}
 
+		msg, _ := json.Marshal(map[string]any{"id": result, "pod": pod})
+		_, _, err = kafkaProducer.SendMessage(&sarama.ProducerMessage{
+			Topic: notificationsTopic,
+			Value: sarama.ByteEncoder(msg),
+		})
+		if err != nil {
+			log.Printf("Kafka 메시지 전송 실패: %v", err)
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"id":  result,
@@ -81,4 +118,55 @@ func main() {
 
 	fmt.Println("Notiflex API listening on :8080")
 	http.ListenAndServe(":8080", nil)
+}
+
+func runConsumer(broker string, cfg *sarama.Config) {
+	pod := os.Getenv("POD_NAME")
+	if pod == "" {
+		pod = "local"
+	}
+
+	var group sarama.ConsumerGroup
+	var err error
+	for i := 0; i < 10; i++ {
+		group, err = sarama.NewConsumerGroup([]string{broker}, "notiflex-api-consumer", cfg)
+		if err == nil {
+			break
+		}
+		log.Printf("Kafka Consumer 연결 재시도 %d/10: %v", i+1, err)
+		time.Sleep(3 * time.Second)
+	}
+	if err != nil {
+		log.Printf("Kafka Consumer 연결 실패: %v", err)
+		return
+	}
+	defer group.Close()
+
+	handler := &notificationsHandler{pod: pod}
+	ctx := context.Background()
+	for {
+		if err := group.Consume(ctx, []string{notificationsTopic}, handler); err != nil {
+			if strings.Contains(err.Error(), "context canceled") {
+				return
+			}
+			log.Printf("Kafka Consumer 에러: %v", err)
+			time.Sleep(3 * time.Second)
+		}
+	}
+}
+
+type notificationsHandler struct {
+	pod string
+}
+
+func (h *notificationsHandler) Setup(sarama.ConsumerGroupSession) error   { return nil }
+func (h *notificationsHandler) Cleanup(sarama.ConsumerGroupSession) error { return nil }
+
+func (h *notificationsHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+	for msg := range claim.Messages() {
+		log.Printf("kafka consumed: topic=%s partition=%d offset=%d value=%s consumer_pod=%s",
+			msg.Topic, msg.Partition, msg.Offset, string(msg.Value), h.pod)
+		sess.MarkMessage(msg, "")
+	}
+	return nil
 }
