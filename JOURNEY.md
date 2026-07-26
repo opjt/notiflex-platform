@@ -28,9 +28,9 @@
 | ch7 | 7.2 멀티 노드풀 | ✅ | 2026-07-23 | api-pool, worker-pool 생성. ops-pool은 IP 쿼터 초과로 보류 |
 | ch7 | 7.3 App of Apps | ✅ | 2026-07-23 | root-app + argocd/apps/, notiflex-smb 이관 |
 | ch7 | 7.4 멀티테넌시 | ✅ | 2026-07-23 | k8s/enterprise/ 생성. Valkey 비밀번호는 최초 평문 K8s Secret → 이후 smb와 동일하게 GCP Secret Manager+CSI+Workload Identity로 전환 완료 |
-| ch8 | 8.1 메시징 | ⬜ | | |
-| ch8 | 8.2 트레이싱 | ⬜ | | |
-| ch8 | 8.3 CronJob | ⬜ | | |
+| ch8 | 8.1 메시징 | ✅ | 2026-07-26 | Kafka(Strimzi, KRaft, worker-pool), Producer/Consumer 구조 전환 v0.7.0 |
+| ch8 | 8.2 트레이싱 | ✅ | 2026-07-26 | Grafana Tempo(worker-pool), OTel SDK 적용 v0.8.0, Tempo OOMKilled로 리소스 상향 |
+| ch8 | 8.3 CronJob | ✅ | 2026-07-26 | notiflex-healthcheck CronJob(worker-pool), 5분마다 /health 체크 |
 | ch9 | 9.1 저장소 분석 | ⬜ | | |
 | ch9 | 9.2 회고 | ⬜ | | |
 | ch9 | 9.3 온보딩 문서 | ⬜ | | |
@@ -58,13 +58,16 @@
 | 여러 앱 관리 (ch7.3) | App of Apps | ApplicationSet, 수동 관리 | 관리 앱 5~7개 수준, 순수 YAML로 충분, root-app이 argocd/apps/ 디렉터리 감시 |
 | 멀티테넌시 (ch7.4) | Namespace 분리 + per-tenant Rollout | 단일 namespace + 라벨 격리, vCluster | 강한 격리, ArgoCD App of Apps와 자연 결합, 테넌트별 독립 배포 |
 | enterprise 시크릿 관리 (ch7.4) | GCP Secret Manager + CSI + Workload Identity (smb와 동일 secret 재사용) | 평문 K8s Secret 유지 | public 저장소에 실제 비밀번호 노출 방지, smb와 동일 패턴으로 통일, 같은 Valkey를 공유하므로 별도 secret 불필요 |
+| 이벤트 드리븐 메시징 (ch8.1) | Apache Kafka (Strimzi Operator, KRaft) | NATS, RabbitMQ, Redis Streams | 업계 표준으로 실무 전이율 높음, GitOps 호환 CRD, 메시지 영속성. 클러스터 규모만 보면 NATS가 더 적합하지만 학습 가치 우선 |
+| 분산 트레이싱 (ch8.2) | Grafana Tempo | Jaeger, Zipkin | 기존 Grafana에 통합, Prometheus+Loki+Tempo 3축 완성, OTLP 네이티브, 경량 |
+| 배치 자동화 (ch8.3) | K8s CronJob | 외부 cron, Argo Workflows, Airflow | 쿠버네티스 네이티브, 추가 설치 없음, ArgoCD가 매니페스트로 관리, 단순 주기 작업엔 DAG 도구가 과함 |
 
 ## 현재 버전
 
 | 컴포넌트 | 버전 | 변경 이력 |
 |---------|------|----------|
 | Go | 1.25 | |
-| Notiflex 이미지 | sha-6a8de73 | v0.6.0, Canary 배포 검증 (ch6.3) |
+| Notiflex 이미지 | sha-0c1d8bb | v0.8.0, Kafka Producer/Consumer + OTel 트레이싱 (ch8.1~8.2) |
 | Argo Rollouts | v1.9.0 | Canary 전략으로 변경 (ch6.3) |
 | Valkey | 9.1.0 | Helm valkey-6.2.0 (ch6.1) |
 | ArgoCD | v3.4.4 | ch3.2에서 설치 |
@@ -73,8 +76,9 @@
 | Loki | 3.6.7 | SingleBinary 모드 (ch4.3) |
 | Fluent Bit | 2.1.0 | grafana/fluent-bit-plugin-loki (ch4.3) |
 | webhook-bridge | v0.1.0 | torchi.app 알림 브릿지 (ch4.4) |
-| Kafka | | |
-| OTel SDK | | |
+| Kafka | 4.3.0 | Strimzi Operator 1.1.0, KRaft 모드, worker-pool (ch8.1) |
+| Tempo | 2.9.0 | grafana/tempo Helm 차트, worker-pool (ch8.2) |
+| OTel SDK | v1.44.0 | go.opentelemetry.io/otel, otlptracegrpc exporter (ch8.2) |
 | notiflex-api replicas | 2 | 1→2로 확장 (ch7.2) |
 
 ## 현재 리소스
@@ -83,8 +87,8 @@
 |--------|----------|---------|-------------|
 | default-pool | e2-standard-2 | 2 (Spot VM) | valkey, 모니터링 스택 |
 | api-pool | e2-medium | 1 (Spot VM) | notiflex-api (nodeSelector, ch7.2) |
-| worker-pool | e2-standard-2 | 1 (Spot VM) | (미배치, ch8.1 Kafka 예정) |
-| ops-pool | - | 0 | 미생성. 리전 외부 IP 쿼터(IN_USE_ADDRESSES 4/4) 초과로 보류. 8.2 Tempo는 worker-pool에 통합 배치 예정 |
+| worker-pool | e2-standard-2 | 1 (Spot VM) | Kafka(Strimzi operator, broker, entity-operator), Tempo, notiflex-healthcheck CronJob |
+| ops-pool | - | 0 | 미생성. 리전 외부 IP 쿼터(IN_USE_ADDRESSES 4/4) 초과로 보류. Tempo·CronJob은 계획대로 worker-pool에 통합 배치 완료 |
 
 ## 트러블슈팅 이력
 
@@ -111,3 +115,7 @@
 | ch7.2 | ArgoCD auto-sync가 커밋을 바로 못 가져옴 | `kubectl patch application <app> -n argocd --type merge -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'`로 수동 hard refresh |
 | ch7.4 | 가드레일이 valkey-secret.yaml에 실제 비밀번호를 평문으로 커밋하라고 함 | public 저장소라 노출 위험 → 파일 대신 kubectl create secret으로 클러스터에 직접 생성(git 미포함), 이후 Secret Manager로 재전환 |
 | ch7.4(부가) | ArgoCD admin 비밀번호 분실(ch4.2 htpasswd 리셋 값 미기록) | argocd-secret의 admin.password를 새 bcrypt 해시로 재패치하여 재설정 |
+| ch8.1 | KafkaNodePool/Kafka에 nodeSelector 필드 없음 | `spec.template.pod.nodeSelector` 대신 `affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution`으로 우회 |
+| ch8.1 | Strimzi가 실제 지원하는 Kafka 버전 확인 필요 | `STRIMZI_KAFKA_IMAGES` 환경변수로 지원 버전(4.2.0/4.2.1/4.3.0) 확인 후 4.3.0 사용, sarama도 V4_3_0_0 지원하는 v1.60.0 사용 |
+| ch8.2 | Tempo 데이터소스 포트 오인 | 서비스 포트명이 `tempo-prom-metrics:3200`이라 메트릭 전용인 줄 알았으나 실제로는 HTTP 쿼리 API 포트(`server.http_listen_port` 기본값). Grafana datasource URL을 3200으로 지정 |
+| ch8.2 | Tempo OOMKilled → CrashLoopBackOff | 초기 memory limit(256Mi)이 부족해 검색 쿼리 몰릴 때 OOM. requests/limits를 256Mi/768Mi로 상향 |
